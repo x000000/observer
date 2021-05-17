@@ -25,11 +25,7 @@ set(observer_SOURCES
         action-config.cpp
         action-config-dialog.cpp
         delegates/buttons-delegate.cpp
-        delegates/multiline-delegate.cpp
-        delegates/action-delegate.cpp
-        delegates/spinbox-delegate.cpp
         settings-model.cpp
-        action-delegate-editor.cpp
         observer-settings.cpp
         ws-chat-client.cpp
         )
@@ -38,17 +34,12 @@ set(observer_HEADERS
         action-config.hpp
         action-config-dialog.hpp
         delegates/buttons-delegate.hpp
-        delegates/multiline-delegate.hpp
-        delegates/action-delegate.hpp
-        delegates/spinbox-delegate.hpp
         settings-model.hpp
-        action-delegate-editor.hpp
         observer-settings.hpp
         ws-chat-client.hpp
         )
 set(observer_UI
         action-config-dialog.ui
-        action-delegate-editor.ui
         observer-settings.ui
         )
 qt5_wrap_ui(observer_UI_HEADERS

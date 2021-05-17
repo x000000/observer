@@ -3,9 +3,6 @@
 #include <QDialog>
 #include "observer.hpp"
 #include "delegates/buttons-delegate.hpp"
-#include "delegates/multiline-delegate.hpp"
-#include "delegates/spinbox-delegate.hpp"
-#include "delegates/action-delegate.hpp"
 #include "settings-model.hpp"
 
 class Ui_ObserverSettings;

@@ -64,7 +64,7 @@ void WsChatClient::onConnected()
 
 void WsChatClient::onWelcomeReceived(QString message)
 {
-    warn(">> '%s'", message.toStdString().c_str());
+    debug(">> '%s'", message.toStdString().c_str());
 
     if (message.startsWith(_welcome_msg.c_str())) {
         disconnect(&_socket, &QWebSocket::textMessageReceived, this, &WsChatClient::onWelcomeReceived);
@@ -77,16 +77,16 @@ void WsChatClient::onWelcomeReceived(QString message)
 void WsChatClient::onTextMessageReceived(QString message)
 {
     if (message.startsWith("PING ")) {
-        warn(">> '%s'", message.toStdString().c_str());
+        debug(">> '%s'", message.toStdString().c_str());
         send("PONG");
     } else {
         QString name, text;
         UserType flags;
         if (tryParsePrivmsg(message, name, text, flags)) {
-            warn(">> %s: %s", name.toStdString().c_str(), text.toStdString().c_str());
+            debug(">> %s: %s", name.toStdString().c_str(), text.toStdString().c_str());
             emit privMessageReceived(name, text, flags);
         } else {
-            warn(">> '%s'", message.toStdString().c_str());
+            debug(">> '%s'", message.toStdString().c_str());
         }
     }
 }
@@ -169,20 +169,20 @@ bool WsChatClient::tryParsePrivmsg(QString &message, QString &name, QString &tex
 
 void WsChatClient::send(const char* msg)
 {
-    warn("<< %s", msg);
+    debug("<< %s", msg);
     _socket.sendTextMessage(QString::fromUtf8(msg));
 }
 
 void WsChatClient::send(const QString msg)
 {
-    warn("<< %s", msg.toStdString().c_str());
+    debug("<< %s", msg.toStdString().c_str());
     _socket.sendTextMessage(msg);
 }
 
 void WsChatClient::onSslErrors(const QList<QSslError> &errors)
 {
     Q_UNUSED(errors);
-    warn("-> SSL error received");
+    debug("-> SSL error received");
     // WARNING: Never ignore SSL errors in production code.
     // _socket.ignoreSslErrors();
 }

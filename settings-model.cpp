@@ -4,7 +4,6 @@
 #include <QSize>
 
 #define tr(token) obs_module_text("observer_settings." token)
-#define item_object() _settings.actions[index.row()]
 #define item_field(field) _settings.actions[index.row()].field
 
 static QString implode(const std::vector<std::string> &vec, const char *delim = "\n")
@@ -19,29 +18,6 @@ static QString implode(const std::vector<std::string> &vec, const char *delim = 
     }
     return str;
 }
-
-static std::vector<std::string> to_std_vector(const QStringList &vec)
-{
-    std::vector<std::string> vector;
-    vector.reserve(vec.size());
-
-    for (auto it = vec.begin(); it < vec.end(); it++) {
-        vector.push_back(it->toStdString());
-    }
-    return vector;
-}
-
-static QStringList to_string_list(const std::vector<std::string> &vec)
-{
-    QStringList list;
-    list.reserve(vec.size());
-
-    for (auto it = vec.begin(); it < vec.end(); it++) {
-        list.push_back(QString::fromStdString(*it));
-    }
-    return list;
-}
-
 
 #define add_enum(item) { item, #item }
 

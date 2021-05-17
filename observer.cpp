@@ -37,8 +37,6 @@ bool scene_item_lookup(obs_scene_t *, obs_sceneitem_t *item, void *ctx)
     obs_source_t *source = obs_sceneitem_get_source(item);
     const char *name = obs_source_get_name(source);
 
-    warn("Scene item: %s", name);
-
     if (strcmp(name, "Image B") == 0) {
         context->items.push_back(item);
         if (context->is_scene_active) {
