@@ -287,7 +287,6 @@ void on_setting_closed(bool result)
         save_settings(settings_window->model()->settings());
         init();
     }
-    delete settings_window;
     settings_window = nullptr;
 }
 
@@ -300,18 +299,19 @@ bool obs_module_load(void)
     }
 
     obs_frontend_add_tools_menu_item(obs_module_text("observer_settings.menuitem"), [](void *) {
-        obs_frontend_push_ui_translation(obs_module_get_string);
-
         if (!settings_window) {
+            obs_frontend_push_ui_translation(obs_module_get_string);
             settings_window = new ObserverSettings(read_settings());
-            QObject::connect(settings_window, &ObserverSettings::closed, &on_setting_closed);
-            settings_window->show();
+            obs_frontend_pop_ui_translation();
+
+            QObject::connect(settings_window, &QDialog::finished, &on_setting_closed);
+
+            settings_window->setAttribute(Qt::WA_DeleteOnClose);
+            settings_window->open();
         } else {
             settings_window->show();
             settings_window->raise();
         }
-
-        obs_frontend_pop_ui_translation();
     }, nullptr);
 
 //    signal_handler_t *handler = obs_get_signal_handler();

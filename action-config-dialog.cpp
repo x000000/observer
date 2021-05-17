@@ -61,7 +61,7 @@ QStringList get_source_items()
 
 
 ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *parent)
-    : QDialog(parent), ui(new Ui::ActionConfigDialog)
+    : QDialog(parent), ui(new Ui_ActionConfigDialog)
 {
     ui->setupUi(this);
 
@@ -103,7 +103,7 @@ void ActionConfigDialog::save(action_descriptor *settings)
     settings->type        = static_cast<ActionType>(ui->actionType->currentData().toInt());
     settings->sceneitems  = to_std_vector(ui->affectedSources->toPlainText().split(line_split_regex, Qt::SkipEmptyParts));
     settings->users       = to_std_vector(ui->users->toPlainText().split(line_split_regex, Qt::SkipEmptyParts));
-    settings->expression  = ui->pattern->text().toStdString();
+    settings->expression  = ui->pattern->text().trimmed().toStdString();
     settings->ignore_case = ui->ignoreCase->isChecked();
     settings->timeout     = ui->timeout->value();
 }

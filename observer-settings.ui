@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>ObserverSettings</class>
- <widget class="ObserverSettings" name="ObserverSettings">
+ <widget class="QDialog" name="ObserverSettings">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -12,6 +12,9 @@
   </property>
   <property name="windowTitle">
    <string>Observer Settings</string>
+  </property>
+  <property name="sizeGripEnabled">
+   <bool>true</bool>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -86,16 +89,9 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="accept_btn">
-       <property name="text">
-        <string>observer_settings.accept</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="cancel_btn">
-       <property name="text">
-        <string>observer_settings.cancel</string>
+      <widget class="QDialogButtonBox" name="dialog_buttons">
+       <property name="standardButtons">
+        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
        </property>
       </widget>
      </item>
@@ -103,14 +99,6 @@
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>ObserverSettings</class>
-   <extends>QWidget</extends>
-   <header>observer-settings.hpp</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections>
   <connection>
@@ -130,41 +118,39 @@
    </hints>
   </connection>
   <connection>
-   <sender>cancel_btn</sender>
-   <signal>clicked()</signal>
+   <sender>dialog_buttons</sender>
+   <signal>accepted()</signal>
    <receiver>ObserverSettings</receiver>
-   <slot>close()</slot>
+   <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>845</x>
+     <x>485</x>
      <y>278</y>
     </hint>
     <hint type="destinationlabel">
-     <x>459</x>
+     <x>299</x>
      <y>149</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>accept_btn</sender>
-   <signal>clicked()</signal>
+   <sender>dialog_buttons</sender>
+   <signal>rejected()</signal>
    <receiver>ObserverSettings</receiver>
-   <slot>accept()</slot>
+   <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>709</x>
+     <x>485</x>
      <y>278</y>
     </hint>
     <hint type="destinationlabel">
-     <x>459</x>
+     <x>299</x>
      <y>149</y>
     </hint>
    </hints>
   </connection>
  </connections>
  <slots>
-  <signal>closed(bool)</signal>
   <slot>addActionItem()</slot>
-  <slot>accept()</slot>
  </slots>
 </ui>

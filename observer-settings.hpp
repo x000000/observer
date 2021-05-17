@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include <QDialog>
 #include "observer.hpp"
 #include "delegates/buttons-delegate.hpp"
 #include "delegates/multiline-delegate.hpp"
@@ -10,9 +10,10 @@
 
 class Ui_ObserverSettings;
 
-class ObserverSettings : public QWidget
+class ObserverSettings : public QDialog
 {
     Q_OBJECT
+
     Ui_ObserverSettings *ui;
 
 public:
@@ -21,21 +22,10 @@ public:
 
     ObserverSettingsModel *model() { return &_model; }
 
-Q_SIGNALS:
-    void closed(bool result);
-
 public Q_SLOTS:
     void addActionItem();
-    void accept() {
-        _dialogResult = true;
-        close();
-    }
-
-protected:
-    void closeEvent(QCloseEvent *event) override;
 
 private:
-    bool _dialogResult = false;
     ObserverSettingsModel _model;
     ButtonDelegate _buttonsDelegate;
 

@@ -7,7 +7,7 @@
 #define tr(token) obs_module_text("observer_settings." token)
 
 ObserverSettings::ObserverSettings(observer_settings settings, QWidget *parent)
-    : QWidget(parent)
+    : QDialog(parent)
     , ui(new Ui_ObserverSettings)
     , _model(settings)
     , _buttonsDelegate(std::vector<QString> { tr("edit"), tr("delete") })
@@ -61,12 +61,6 @@ void ObserverSettings::onRowsInserted(const QModelIndex &/* parent */, int first
     ui->tableView->resizeColumnToContents(Columns::Action);
 }
 
-void ObserverSettings::closeEvent(QCloseEvent *event)
-{
-    QWidget::closeEvent(event);
-    emit closed(_dialogResult);
-}
-
 void ObserverSettings::openEditors(int row)
 {
     auto t = ui->tableView;
@@ -99,6 +93,7 @@ void ObserverSettings::onButtonClicked(const QModelIndex &index, const int butto
             QObject::connect(dialog, &QDialog::accepted, [dialog, action, row, this] {
                 dialog->save(action);
                 emit _model.dataChanged(_model.index(row, 0), _model.index(row, Columns::COUNT - 1));
+                ui->tableView->resizeColumnsToContents();
             });
 
             dialog->setAttribute(Qt::WA_DeleteOnClose);
