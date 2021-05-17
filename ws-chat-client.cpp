@@ -76,18 +76,22 @@ void WsChatClient::onWelcomeReceived(QString message)
 
 void WsChatClient::onTextMessageReceived(QString message)
 {
-    if (message.startsWith("PING ")) {
-        debug(">> '%s'", message.toStdString().c_str());
-        send("PONG");
-    } else {
-        QString name, text;
-        UserType flags;
-        if (tryParsePrivmsg(message, name, text, flags)) {
-            debug(">> %s: %s", name.toStdString().c_str(), text.toStdString().c_str());
-            emit privMessageReceived(name, text, flags);
-        } else {
+    QT_TRY {
+        if (message.startsWith("PING ")) {
             debug(">> '%s'", message.toStdString().c_str());
+            send("PONG");
+        } else {
+            QString name, text;
+            UserType flags;
+            if (tryParsePrivmsg(message, name, text, flags)) {
+                debug(">> %s: %s", name.toStdString().c_str(), text.toStdString().c_str());
+                emit privMessageReceived(name, text, flags);
+            } else {
+                debug(">> '%s'", message.toStdString().c_str());
+            }
         }
+    } QT_CATCH (...) {
+        warn("Failed to handle incoming message");
     }
 }
 
