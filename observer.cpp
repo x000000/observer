@@ -63,7 +63,8 @@ bool scene_lookup(void *ctx, obs_source_t *source)
 class ActionHandler
 {
 public:
-    explicit ActionHandler(const action_descriptor &descr) : _pattern(QString::fromStdString(descr.expression))
+    explicit ActionHandler(const action_descriptor &descr)
+        : _pattern(QString::fromStdString(descr.expression), descr.ignore_case ? Qt::CaseInsensitive : Qt::CaseSensitive)
     {
         for (const auto &user : descr.users) {
             if (user == "@mod") {
@@ -212,12 +213,13 @@ struct observer_settings read_settings()
         auto item = obs_data_array_item(actions, i);
 
         config.actions.push_back({
-            .type       = static_cast<ActionType>(obs_data_get_int(item, "type")),
-            .sceneitems = read_string_array(item,   "sceneitems"),
-            .users      = read_string_array(item,   "users"),
-            .expression = obs_data_get_string(item, "expression"),
-            .is_active  = obs_data_get_bool(item,   "is_active"),
-            .timeout    = static_cast<int>(obs_data_get_int(item, "timeout")),
+            .type        = static_cast<ActionType>(obs_data_get_int(item, "type")),
+            .sceneitems  = read_string_array(item,   "sceneitems"),
+            .users       = read_string_array(item,   "users"),
+            .expression  = obs_data_get_string(item, "expression"),
+            .ignore_case = obs_data_get_bool(item,   "ignore_case"),
+            .active      = obs_data_get_bool(item,   "active"),
+            .timeout     = static_cast<int>(obs_data_get_int(item, "timeout")),
         });
 
         obs_data_release(item);
@@ -239,7 +241,8 @@ void save_settings(const observer_settings *config)
         obs_set_string_array(sceneitems);
 
         obs_set_string(expression);
-        obs_set(bool,  is_active);
+        obs_set(bool,  ignore_case);
+        obs_set(bool,  active);
         obs_set(int,   timeout);
         obs_set(int,   type);
 
@@ -264,7 +267,7 @@ void init()
     mod_settings = read_settings();
 
     for (auto &d : mod_settings.actions) {
-        if (d.is_active) {
+        if (d.active) {
             try {
                 d.handler = new ActionHandler(d);
             } catch (...) {

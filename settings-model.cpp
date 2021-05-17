@@ -1,7 +1,9 @@
 #include "action-config.hpp"
 #include "settings-model.hpp"
+#include <obs-module.h>
 #include <QSize>
 
+#define tr(token) obs_module_text("observer_settings." token)
 #define item_object() _settings.actions[index.row()]
 #define item_field(field) _settings.actions[index.row()].field
 
@@ -41,6 +43,14 @@ static QStringList to_string_list(const std::vector<std::string> &vec)
 }
 
 
+#define add_enum(item) { item, #item }
+
+static QMap<int, std::string> action_labels {
+    add_enum(ActionType::Toggle),
+    add_enum(ActionType::Hide),
+    add_enum(ActionType::Show),
+};
+
 ObserverSettingsModel::ObserverSettingsModel(observer_settings settings, QObject *parent)
     : QAbstractTableModel(parent), _settings(settings)
 {
@@ -66,18 +76,30 @@ QVariant ObserverSettingsModel::data(const QModelIndex &index, int role) const
             switch (col) {
                 case Columns::Users: {
                     auto users = implode(item_field(users));
-                    return users.isEmpty() ? "[Any]" : users;
+                    return users.isEmpty() ? tr("any_user") : users;
                 }
 
-                case Columns::Expr:
-                    return QString::fromStdString(item_field(expression));
+                case Columns::Expr: {
+                    auto str = QString::fromStdString(item_field(expression)).prepend('/').append('/');
+                    return item_field(ignore_case) ? str.append('i') : str;
+                }
 
-                case Columns::Timeout:
-                    return QString("%1").arg(item_field(timeout));
+                case Columns::Action: {
+                    auto sources = implode(item_field(sceneitems));
+                    if (sources.isEmpty()) {
+                        return QString();
+                    }
 
-                case Columns::Del:
+                    auto timeout = item_field(timeout);
+
+                    return QString::fromStdString(timeout > 0 ? tr("action_to") : tr("action"))
+                        .arg(obs_module_text(action_labels.value(item_field(type)).c_str()))
+                        .arg(sources)
+                        .arg(timeout);
+                }
+
+                case Columns::Buttons:
                 case Columns::Active:
-                case Columns::Action:
                     return QString();
 
                 default:
@@ -86,27 +108,7 @@ QVariant ObserverSettingsModel::data(const QModelIndex &index, int role) const
 
         case Qt::CheckStateRole:
             if (col == Columns::Active) {
-                return item_field(is_active) ? Qt::Checked : Qt::Unchecked;
-            }
-            break;
-
-        case Qt::EditRole:
-            switch (col) {
-                case Columns::Users: {
-                    auto list = to_string_list(item_field(users));
-                    return list.isEmpty() ? list : list << "";
-                }
-
-                case Columns::Expr:
-                    return QString::fromStdString(item_field(expression));
-
-                case Columns::Timeout:
-                    return item_field(timeout);
-
-                case Columns::Action:
-                    auto type  = item_field(type);
-                    auto items = to_string_list(item_field(sceneitems));
-                    return QVariant::fromValue(ActionConfig(type, items));
+                return item_field(active) ? Qt::Checked : Qt::Unchecked;
             }
             break;
     }
@@ -118,31 +120,10 @@ bool ObserverSettingsModel::setData(const QModelIndex &index, const QVariant &va
     switch (index.column()) {
         case Columns::Active:
             if (role == Qt::CheckStateRole) {
-                item_field(is_active) = value.toBool();
+                item_field(active) = value.toBool();
                 return true;
             }
             break;
-
-        case Columns::Users: {
-            item_field(users) = to_std_vector(value.toStringList());
-            emit dataChanged(index, index, { role });
-            return true;
-        }
-
-        case Columns::Expr:
-            item_field(expression) = value.toString().trimmed().toStdString();
-            return true;
-
-        case Columns::Timeout:
-            item_field(timeout) = value.toInt();
-            return true;
-
-        case Columns::Action:
-            auto config = qvariant_cast<ActionConfig>(value);
-            item_field(type)       = config.type();
-            item_field(sceneitems) = to_std_vector(config.sources());
-            emit dataChanged(index, index, { role });
-            return true;
     }
     return false;
 }
@@ -151,18 +132,12 @@ QVariant ObserverSettingsModel::headerData(int section, Qt::Orientation orientat
 {
     if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
         switch (section) {
-            /*
-            case Columns::Active:
-                return QString("");
-             */
             case Columns::Users:
-                return QString("Users");
+                return QString(tr("head_users"));
             case Columns::Expr:
-                return QString("Pattern");
-            case Columns::Timeout:
-                return QString("Timeout");
+                return QString(tr("head_expression"));
             case Columns::Action:
-                return QString("Action");
+                return QString(tr("head_action"));
         }
     }
     return QVariant();
@@ -173,10 +148,6 @@ Qt::ItemFlags ObserverSettingsModel::flags(const QModelIndex &index) const
     switch (index.column()) {
         case Columns::Active:
             return Qt::ItemIsEnabled | Qt::ItemIsUserCheckable;
-        case Columns::Users:
-        case Columns::Expr:
-        case Columns::Timeout:
-            return Qt::ItemIsEnabled | Qt::ItemIsEditable | Qt::ItemIsSelectable;
     }
     return Qt::ItemIsEnabled;
 }

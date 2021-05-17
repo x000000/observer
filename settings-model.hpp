@@ -4,13 +4,12 @@
 #include "observer.hpp"
 
 enum Columns {
-    Del     = 0,
+    Buttons = 0,
     Active  = 1,
     Users   = 2,
     Expr    = 3,
-    Timeout = 4,
-    Action  = 5,
-    COUNT   = 6,
+    Action  = 4,
+    COUNT   = 5,
 };
 
 class ObserverSettingsModel : public QAbstractTableModel

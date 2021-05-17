@@ -1,33 +1,37 @@
+#include <obs-module.h>
+#include <obs-frontend-api.h>
 #include "observer-settings.hpp"
+#include "action-config-dialog.hpp"
 #include "ui_observer-settings.h"
 
+#define tr(token) obs_module_text("observer_settings." token)
+
 ObserverSettings::ObserverSettings(observer_settings settings, QWidget *parent)
-    : QWidget(parent), ui(new Ui_ObserverSettings), _model(settings), _deleteButtonDelegate("Delete")
+    : QWidget(parent)
+    , ui(new Ui_ObserverSettings)
+    , _model(settings)
+    , _buttonsDelegate(std::vector<QString> { tr("edit"), tr("delete") })
 {
     ui->setupUi(this);
 
     auto t = ui->tableView;
-    t->setItemDelegateForColumn(Columns::Del,     &_deleteButtonDelegate);
-    t->setItemDelegateForColumn(Columns::Timeout, &_spinboxDelegate);
-    t->setItemDelegateForColumn(Columns::Users,   &_multilineDelegate);
-    t->setItemDelegateForColumn(Columns::Action,  &_actionDelegate);
+    t->setItemDelegateForColumn(Columns::Buttons, &_buttonsDelegate);
     t->setModel(&_model);
-    t->horizontalHeader()->setSectionResizeMode(Columns::Del,    QHeaderView::ResizeToContents);
-    t->horizontalHeader()->setSectionResizeMode(Columns::Active, QHeaderView::ResizeToContents);
-    t->setColumnWidth(Columns::Users,   160);
-    t->setColumnWidth(Columns::Expr,    300);
-    t->setColumnWidth(Columns::Timeout, 80);
+    t->horizontalHeader()->setSectionResizeMode(Columns::Buttons, QHeaderView::ResizeToContents);
+    t->horizontalHeader()->setSectionResizeMode(Columns::Active,  QHeaderView::ResizeToContents);
+    t->setColumnWidth(Columns::Users, 160);
+    t->setColumnWidth(Columns::Expr,  300);
 
     for (auto row = 0; row < _model.rowCount(); row++) {
         openEditors(row);
     }
-    t->resizeColumnToContents(Columns::Action);
+    t->resizeColumnsToContents();
 
     ui->channel_input->setText(QString::fromStdString(_model.settings()->channel));
 
     QObject::connect(&_model, &QAbstractItemModel::dataChanged, this, &ObserverSettings::onDataChanged);
     QObject::connect(&_model, &QAbstractItemModel::rowsInserted, this, &ObserverSettings::onRowsInserted);
-    QObject::connect(&_deleteButtonDelegate, &ButtonDelegate::clicked, this, &ObserverSettings::onDeleteClicked);
+    QObject::connect(&_buttonsDelegate, &ButtonDelegate::clicked, this, &ObserverSettings::onButtonClicked);
 
     QObject::connect(ui->channel_input, &QLineEdit::textChanged, [this](const QString &str) {
         _model.settings()->channel = str.toStdString();
@@ -66,17 +70,12 @@ void ObserverSettings::closeEvent(QCloseEvent *event)
 void ObserverSettings::openEditors(int row)
 {
     auto t = ui->tableView;
-    auto deleteIndex = _model.index(row, Columns::Del);
-    auto actionIndex = _model.index(row, Columns::Action);
+    auto deleteIndex = _model.index(row, Columns::Buttons);
 
     t->openPersistentEditor(deleteIndex);
-    t->openPersistentEditor(actionIndex);
 
     EditorReferencedEvent ev(QEvent::Show, t->indexWidget(deleteIndex));
     t->itemDelegate(deleteIndex)->editorEvent(&ev, &_model, QStyleOptionViewItem(), deleteIndex);
-
-    ev = EditorReferencedEvent(QEvent::Show, t->indexWidget(actionIndex));
-    t->itemDelegate(actionIndex)->editorEvent(&ev, &_model, QStyleOptionViewItem(), actionIndex);
 
     t->resizeRowToContents(row);
 }
@@ -86,16 +85,35 @@ void ObserverSettings::addActionItem()
     _model.addItem();
 }
 
-void ObserverSettings::onDeleteClicked(const QModelIndex &index, bool)
+void ObserverSettings::onButtonClicked(const QModelIndex &index, const int buttonIndex, bool)
 {
-    _model.removeItem(index.row());
+    switch (buttonIndex) {
+        case 0: {
+            auto row = index.row();
+            auto action = &_model.settings()->actions[row];
 
-    auto t = ui->tableView;
-    for (int row = index.row(), l = _model.rowCount(); row < l; row++) {
-        auto deleteIndex = _model.index(row, Columns::Del);
-        auto actionIndex = _model.index(row, Columns::Action);
+            obs_frontend_push_ui_translation(obs_module_get_string);
+            auto dialog = new ActionConfigDialog(action);
+            obs_frontend_pop_ui_translation();
 
-        _deleteButtonDelegate.updateIndex(deleteIndex, &_model, t->indexWidget(deleteIndex));
-        _actionDelegate.updateIndex(actionIndex, &_model, t->indexWidget(actionIndex));
+            QObject::connect(dialog, &QDialog::accepted, [dialog, action, row, this] {
+                dialog->save(action);
+                emit _model.dataChanged(_model.index(row, 0), _model.index(row, Columns::COUNT - 1));
+            });
+
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->open();
+        }
+            break;
+
+        case 1:
+            _model.removeItem(index.row());
+
+            auto t = ui->tableView;
+            for (int row = index.row(), l = _model.rowCount(); row < l; row++) {
+                auto deleteIndex = _model.index(row, Columns::Buttons);
+                _buttonsDelegate.updateIndex(deleteIndex, &_model, t->indexWidget(deleteIndex));
+            }
+            break;
     }
 }

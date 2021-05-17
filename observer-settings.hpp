@@ -2,7 +2,7 @@
 
 #include <QWidget>
 #include "observer.hpp"
-#include "delegates/button-delegate.hpp"
+#include "delegates/buttons-delegate.hpp"
 #include "delegates/multiline-delegate.hpp"
 #include "delegates/spinbox-delegate.hpp"
 #include "delegates/action-delegate.hpp"
@@ -37,14 +37,11 @@ protected:
 private:
     bool _dialogResult = false;
     ObserverSettingsModel _model;
-    ButtonDelegate _deleteButtonDelegate;
-    SpinBoxDelegate _spinboxDelegate;
-    MultilineDelegate _multilineDelegate;
-    ActionDelegate _actionDelegate;
+    ButtonDelegate _buttonsDelegate;
 
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles);
     void onRowsInserted(const QModelIndex &parent, int first, int last);
-    void onDeleteClicked(const QModelIndex &index, const bool checked);
+    void onButtonClicked(const QModelIndex &index, const int buttonIndex, const bool checked);
 
     void openEditors(int row);
 };

@@ -9,7 +9,7 @@ class ButtonDelegate : public QStyledItemDelegate
 Q_OBJECT
 
 public:
-    ButtonDelegate(QString text, QObject *parent = nullptr);
+    ButtonDelegate(std::vector<QString> buttonLabels, QObject *parent = nullptr);
 
     QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
@@ -20,10 +20,10 @@ public:
 
     void updateIndex(QModelIndex &index, QAbstractItemModel *model, QWidget *widget) override;
 Q_SIGNALS:
-    void clicked(QModelIndex index, bool checked);
+    void clicked(QModelIndex index, int buttonIndex, bool checked);
 
 private:
     void connect(QWidget *widget, QModelIndex index);
 
-    QString _text;
+    std::vector<QString> _buttonLabels;
 };

@@ -46,7 +46,8 @@ struct action_descriptor {
     std::vector<std::string> sceneitems;
     std::vector<std::string> users;
     std::string expression;
-    bool is_active = true;
+    bool ignore_case = true;
+    bool active = true;
     int timeout = 0;
     ActionHandler *handler = nullptr;
 
