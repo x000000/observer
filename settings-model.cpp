@@ -128,14 +128,12 @@ Qt::ItemFlags ObserverSettingsModel::flags(const QModelIndex &index) const
     return Qt::ItemIsEnabled;
 }
 
-void ObserverSettingsModel::addItem()
+void ObserverSettingsModel::addItem(const action_descriptor action)
 {
     auto row = rowCount();
     beginInsertRows(QModelIndex(), row, row);
 
-    _settings.actions.push_back({
-        .type = Toggle,
-    });
+    _settings.actions.push_back(action);
 
     endInsertRows();
 }

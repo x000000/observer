@@ -3,6 +3,7 @@
 #include "observer-settings.hpp"
 #include "action-config-dialog.hpp"
 #include "ui_observer-settings.h"
+#include <functional>
 
 #define tr(token) obs_module_text("observer_settings." token)
 
@@ -74,9 +75,29 @@ void ObserverSettings::openEditors(int row)
     t->resizeRowToContents(row);
 }
 
+void edit_action(action_descriptor *action, std::function<void()> fn)
+{
+    obs_frontend_push_ui_translation(obs_module_get_string);
+    auto dialog = new ActionConfigDialog(action);
+    obs_frontend_pop_ui_translation();
+
+    QObject::connect(dialog, &QDialog::accepted, [dialog, action, fn] {
+        dialog->save(action);
+        fn();
+    });
+
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
+}
+
 void ObserverSettings::addActionItem()
 {
-    _model.addItem();
+    std::shared_ptr<action_descriptor> ptr(new action_descriptor {
+       .type = Toggle,
+    });
+    edit_action(ptr.get(), [this, ptr]() {
+        _model.addItem(*ptr.get());
+    });
 }
 
 void ObserverSettings::onButtonClicked(const QModelIndex &index, const int buttonIndex, bool)
@@ -86,18 +107,10 @@ void ObserverSettings::onButtonClicked(const QModelIndex &index, const int butto
             auto row = index.row();
             auto action = &_model.settings()->actions[row];
 
-            obs_frontend_push_ui_translation(obs_module_get_string);
-            auto dialog = new ActionConfigDialog(action);
-            obs_frontend_pop_ui_translation();
-
-            QObject::connect(dialog, &QDialog::accepted, [dialog, action, row, this] {
-                dialog->save(action);
+            edit_action(action, [row, this]() {
                 emit _model.dataChanged(_model.index(row, 0), _model.index(row, Columns::COUNT - 1));
                 ui->tableView->resizeColumnsToContents();
             });
-
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->open();
         }
             break;
 

@@ -86,8 +86,11 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
 
     QObject::connect(ui->availableSources, &QComboBox::currentTextChanged, [this](const QString &str) {
         if (!str.isEmpty()) {
-            auto text = ui->affectedSources->toPlainText().append('\n').append(str);
-            ui->affectedSources->setPlainText(text);
+            auto text = ui->affectedSources->toPlainText();
+            if (!text.isEmpty()) {
+                text.append('\n');
+            }
+            ui->affectedSources->setPlainText(text.append(str));
             ui->availableSources->setCurrentIndex(-1);
         }
     });

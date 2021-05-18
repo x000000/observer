@@ -26,7 +26,7 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
     [[nodiscard]] Qt::ItemFlags flags(const QModelIndex &index) const override;
 
-    void addItem();
+    void addItem(const action_descriptor action);
     void removeItem(const int index);
 
     observer_settings *settings() { return &_settings; }
