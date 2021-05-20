@@ -25,6 +25,7 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(MOD_NAME, "en-US")
 
 struct sceneitem_lookup_context {
+    const std::vector<std::string> *lookup_names;
     obs_sceneitem_t* pivot_item = nullptr;
     std::vector<obs_sceneitem_t*> items = std::vector<obs_sceneitem_t*>();
     bool is_scene_active = false;
@@ -37,10 +38,13 @@ bool scene_item_lookup(obs_scene_t *, obs_sceneitem_t *item, void *ctx)
     obs_source_t *source = obs_sceneitem_get_source(item);
     const char *name = obs_source_get_name(source);
 
-    if (strcmp(name, "Image B") == 0) {
-        context->items.push_back(item);
-        if (context->is_scene_active) {
-            context->pivot_item = item;
+    for (auto &lookup_name : *(context->lookup_names)) {
+        if (strcmp(name, lookup_name.c_str()) == 0) {
+            context->items.push_back(item);
+            if (context->is_scene_active) {
+                context->pivot_item = item;
+            }
+            break;
         }
     }
 
@@ -80,6 +84,7 @@ public:
         _anyUser = !_userType && _users.isEmpty();
         _actionType = descr.type;
         _timeout = descr.timeout;
+        _sources = descr.sceneitems;
     }
 
     void handle(const QString &user, const QString &message, const UserType &userFlags = UserType::None)
@@ -95,6 +100,7 @@ private:
     UserType _userType = UserType::None;
     ActionType _actionType;
     QVector<QString> _users;
+    std::vector<std::string> _sources;
     bool _anyUser;
     int _timeout;
     long long _lastExec = 0;
@@ -113,7 +119,9 @@ private:
             _lastExec = time;
         }
 
-        sceneitem_lookup_context ctx;
+        sceneitem_lookup_context ctx = {
+            .lookup_names = &_sources
+        };
         obs_enum_scenes(scene_lookup, &ctx);
 
         bool visible;
