@@ -142,8 +142,8 @@ bool WsChatClient::tryParsePrivmsg(QString &message, QString &name, QString &tex
                     for (auto &b : pair.last().split(',')) {
                         if (b.startsWith("vip/")) {
                             flags |= UserType::Vip;
-                        } else if (b.startsWith("stuff/")) {
-                            flags |= UserType::Stuff;
+                        } else if (b.startsWith("staff/")) {
+                            flags |= UserType::Staff;
                         }
                     }
                 }

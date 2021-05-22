@@ -91,8 +91,8 @@ public:
                 _userType |= UserType::Sub;
             } else if (user == "@vip") {
                 _userType |= UserType::Vip;
-            } else if (user == "@stuff") {
-                _userType |= UserType::Stuff;
+            } else if (user == "@staff") {
+                _userType |= UserType::Staff;
             } else {
                 _users.push_back(QString::fromStdString(user));
             }

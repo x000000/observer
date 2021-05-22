@@ -30,7 +30,7 @@ enum UserType {
     Mod   = 1 << 0,
     Sub   = 1 << 1,
     Vip   = 1 << 2,
-    Stuff = 1 << 3,
+    Staff = 1 << 3,
 };
 DEFINE_ENUM_FLAGS(UserType)
 
