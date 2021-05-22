@@ -45,10 +45,12 @@ enum ActionType {
 
 struct sceneitems_context_data {
     std::vector<std::string> sceneitems;
+    int rollback_timeout = 0;
 };
 
 struct scene_context_data {
     std::string scene;
+    int rollback_timeout = 0;
 };
 
 typedef std::variant<

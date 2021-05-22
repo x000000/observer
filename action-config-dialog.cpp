@@ -96,20 +96,28 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
 
     ui->users->setPlainText(implode(settings->users));
 
+    auto sfx = QString::fromStdString(obs_module_text("observer_settings.rollback_timeout_sfx"));
+    ui->sourcesRollback->setSuffix(sfx);
+    ui->sceneRollback->setSuffix(sfx);
+
     switch (settings->type) {
         case ActionType::Toggle:
         case ActionType::Show:
-        case ActionType::Hide:
-            ui->affectedSources->setPlainText(implode(get<sceneitems_context_data>(settings->context_data).sceneitems));
+        case ActionType::Hide: {
+            auto data = get<sceneitems_context_data>(settings->context_data);
+            ui->affectedSources->setPlainText(implode(data.sceneitems));
+            ui->sourcesRollback->setValue(double(data.rollback_timeout) / 1000);
             ui->sceneGroup->setVisible(false);
+        }
             break;
         case ActionType::SwitchScene: {
-            auto text = get<scene_context_data>(settings->context_data).scene;
-            index = ui->affectedScene->findText(QString::fromStdString(text));
+            auto data = get<scene_context_data>(settings->context_data);
+            index = ui->affectedScene->findText(QString::fromStdString(data.scene));
 
             if (ui->affectedScene->currentIndex() != index) {
                 ui->affectedScene->setCurrentIndex(index);
             }
+            ui->sceneRollback->setValue(double(data.rollback_timeout) / 1000);
             ui->sceneItemsGroup->setVisible(false);
         }
             break;
@@ -124,8 +132,12 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
     IntFn sig = &QComboBox::currentIndexChanged;
     QObject::connect(ui->actionType, sig, [this](int) {
         auto type = static_cast<ActionType>(ui->actionType->currentData().toInt());
-        ui->sceneItemsGroup->setVisible(type != ActionType::SwitchScene);
-        ui->sceneGroup     ->setVisible(type == ActionType::SwitchScene);
+        auto isScenes = type == ActionType::SwitchScene;
+
+        ui->sceneItemsGroup->setVisible(!isScenes);
+        ui->sceneGroup->setVisible(isScenes);
+
+        adjustSize();
     });
 
     QObject::connect(ui->availableSources, &QComboBox::currentTextChanged, [this](const QString &str) {
@@ -138,6 +150,8 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
             ui->availableSources->setCurrentIndex(-1);
         }
     });
+
+    adjustSize();
 }
 
 ActionConfigDialog::~ActionConfigDialog()
@@ -155,13 +169,17 @@ void ActionConfigDialog::save(action_descriptor *settings)
         case ActionType::Show:
         case ActionType::Hide:
             data = sceneitems_context_data {
-                to_std_vector(ui->affectedSources->toPlainText().split(line_split_regex, Qt::SkipEmptyParts))
+                .sceneitems = to_std_vector(ui->affectedSources->toPlainText().split(line_split_regex, Qt::SkipEmptyParts)),
+                .rollback_timeout = int((ui->sourcesRollback->value() * 1000)),
             };
             break;
         case ActionType::SwitchScene: {
             auto text = ui->affectedScene->currentText().trimmed();
             if (!text.isEmpty()) {
-                data = scene_context_data { text.toStdString() };
+                data = scene_context_data {
+                    .scene = text.toStdString(),
+                    .rollback_timeout = int((ui->sceneRollback->value() * 1000)),
+                };
             }
         }
             break;

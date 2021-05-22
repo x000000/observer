@@ -1,4 +1,5 @@
 #include <chrono>
+#include <QTimer>
 #include <util/dstr.h>
 #include <util/platform.h>
 #include <obs-module.h>
@@ -100,6 +101,15 @@ public:
         _actionType = descr.type;
         _timeout = descr.timeout;
         _data = descr.context_data;
+
+        int rollback = _actionType == ActionType::SwitchScene
+            ? get<scene_context_data>(_data).rollback_timeout
+            : get<sceneitems_context_data>(_data).rollback_timeout;
+
+        if (rollback > 0) {
+            _timer.setInterval(rollback);
+            _timer.setSingleShot(true);
+        }
     }
 
     void handle(const QString &user, const QString &message, const UserType &userFlags = UserType::None)
@@ -119,6 +129,8 @@ private:
     bool _anyUser;
     int _timeout;
     long long _lastExec = 0;
+    QTimer _timer;
+    QMetaObject::Connection _rollbackConnection;
 
     inline void exec()
     {
@@ -148,8 +160,10 @@ private:
 
     inline void execSceneItemsAction()
     {
+        auto data = get<sceneitems_context_data>(_data);
+
         sceneitem_lookup_context ctx = {
-            .lookup_names = &get<sceneitems_context_data>(_data).sceneitems
+            .lookup_names = &data.sceneitems
         };
         obs_enum_scenes(scene_items_lookup, &ctx);
 
@@ -172,18 +186,44 @@ private:
         for (auto it = ctx.items.begin(); it < ctx.items.end(); it++) {
             obs_sceneitem_set_visible(*it, visible);
         }
+
+        if (data.rollback_timeout > 0) {
+            QObject::disconnect(_rollbackConnection);
+
+            visible = !visible;
+            _rollbackConnection = _timer.callOnTimeout([ctx, visible]() {
+                for (auto it = ctx.items.begin(); it < ctx.items.end(); it++) {
+                    obs_sceneitem_set_visible(*it, visible);
+                }
+            });
+
+            _timer.start();
+        }
     }
 
     inline void execSceneAction()
     {
+        auto data = get<scene_context_data>(_data);
+
         scene_lookup_context ctx = {
-            .lookup_name = get<scene_context_data>(_data).scene.c_str()
+            .lookup_name = data.scene.c_str(),
         };
         obs_enum_scenes(scene_lookup, &ctx);
 
         if (ctx.source != nullptr) {
-            if (obs_frontend_get_current_scene() != ctx.source) {
+            auto current = obs_frontend_get_current_scene();
+            if (current != ctx.source) {
                 obs_frontend_set_current_scene(ctx.source);
+
+                if (data.rollback_timeout > 0) {
+                    QObject::disconnect(_rollbackConnection);
+
+                    _rollbackConnection = _timer.callOnTimeout([current]() {
+                        obs_frontend_set_current_scene(current);
+                    });
+
+                    _timer.start();
+                }
             }
         }
     }
@@ -210,7 +250,9 @@ void on_priv_message_received(const QString &user, const QString &message, const
     }
 }
 
-#define obs_set(type, prop)  obs_data_set_##type(item, #prop, d.prop)
+#define obs_set_(type, propin, propout) obs_data_set_##type(item, propout, propin)
+#define obs_set(type, prop)  obs_set_(type, d.prop, #prop)
+
 #define obs_set_string_(propin, propout) obs_data_set_string(item, #propout, propin)
 #define obs_set_string(prop) obs_set_string_(d.prop.c_str(), prop)
 
@@ -270,10 +312,16 @@ struct observer_settings read_settings()
             case ActionType::Toggle:
             case ActionType::Hide:
             case ActionType::Show:
-                data = sceneitems_context_data { read_string_array(item, "sceneitems") };
+                data = sceneitems_context_data {
+                    .sceneitems = read_string_array(item, "sceneitems"),
+                    .rollback_timeout = static_cast<int>(obs_data_get_int(item, "rollback_timeout")),
+                };
                 break;
             case ActionType::SwitchScene:
-                data = scene_context_data { obs_data_get_string(item, "scene") };
+                data = scene_context_data {
+                    .scene = obs_data_get_string(item, "scene"),
+                    .rollback_timeout = static_cast<int>(obs_data_get_int(item, "rollback_timeout")),
+                };
                 break;
         }
 
@@ -313,11 +361,17 @@ void save_settings(const observer_settings *config)
         switch (d.type) {
             case ActionType::Toggle:
             case ActionType::Hide:
-            case ActionType::Show:
-                obs_set_string_array_(get<sceneitems_context_data>(d.context_data).sceneitems, sceneitems);
+            case ActionType::Show: {
+                auto data = get<sceneitems_context_data>(d.context_data);
+                obs_set_string_array_(data.sceneitems, sceneitems);
+                obs_set_(int, data.rollback_timeout, "rollback_timeout");
+            }
                 break;
-            case ActionType::SwitchScene:
-                obs_set_string_(get<scene_context_data>(d.context_data).scene.c_str(), scene);
+            case ActionType::SwitchScene: {
+                auto data = get<scene_context_data>(d.context_data);
+                obs_set_string_(data.scene.c_str(), scene);
+                obs_set_(int, data.rollback_timeout, "rollback_timeout");
+            }
                 break;
         }
 

@@ -67,11 +67,25 @@ QVariant ObserverSettingsModel::data(const QModelIndex &index, int role) const
                     switch (item_field(type)) {
                         case ActionType::Toggle:
                         case ActionType::Hide:
-                        case ActionType::Show:
-                            sources = implode(get<sceneitems_context_data>(item_field(context_data)).sceneitems);
+                        case ActionType::Show: {
+                            auto data = get<sceneitems_context_data>(item_field(context_data));
+                            sources = implode(data.sceneitems);
+
+                            if (data.rollback_timeout > 0 && !sources.isEmpty()) {
+                                sources.prepend(QString::fromStdString(obs_module_text("observer_settings.action_rollback"))
+                                    .arg(double(data.rollback_timeout) / 1000));
+                            }
+                        }
                             break;
-                        case ActionType::SwitchScene:
-                            sources = QString::fromStdString(get<scene_context_data>(item_field(context_data)).scene);
+                        case ActionType::SwitchScene: {
+                            auto data = get<scene_context_data>(item_field(context_data));
+                            sources = QString::fromStdString(data.scene);
+
+                            if (data.rollback_timeout > 0 && !sources.isEmpty()) {
+                                sources.prepend(QString::fromStdString(obs_module_text("observer_settings.action_rollback"))
+                                    .arg(double(data.rollback_timeout) / 1000));
+                            }
+                        }
                             break;
                         default:
                             return QString();
