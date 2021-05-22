@@ -59,6 +59,21 @@ QStringList get_source_items()
     return sources;
 }
 
+QStringList get_scene_items()
+{
+    QStringList sources;
+
+    obs_enum_scenes([](void *ctx, obs_source_t *source) {
+        const char *name = obs_source_get_name(source);
+        ((QStringList *) ctx)->push_back(QString::fromStdString(name));
+        return true;
+    }, &sources);
+
+    sources.sort();
+    return sources;
+}
+
+typedef void (QComboBox::*IntFn)(int index);
 
 ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *parent)
     : QDialog(parent), ui(new Ui_ActionConfigDialog)
@@ -68,7 +83,9 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
     add_action(ActionType::Toggle);
     add_action(ActionType::Hide);
     add_action(ActionType::Show);
+    add_action(ActionType::SwitchScene);
 
+    ui->affectedScene->addItems(get_scene_items());
     ui->availableSources->addItems(get_source_items());
     ui->availableSources->setCurrentIndex(-1);
 
@@ -78,11 +95,38 @@ ActionConfigDialog::ActionConfigDialog(action_descriptor *settings, QWidget *par
     }
 
     ui->users->setPlainText(implode(settings->users));
-    ui->affectedSources->setPlainText(implode(settings->sceneitems));
+
+    switch (settings->type) {
+        case ActionType::Toggle:
+        case ActionType::Show:
+        case ActionType::Hide:
+            ui->affectedSources->setPlainText(implode(get<sceneitems_context_data>(settings->context_data).sceneitems));
+            ui->sceneGroup->setVisible(false);
+            break;
+        case ActionType::SwitchScene: {
+            auto text = get<scene_context_data>(settings->context_data).scene;
+            index = ui->affectedScene->findText(QString::fromStdString(text));
+
+            if (ui->affectedScene->currentIndex() != index) {
+                ui->affectedScene->setCurrentIndex(index);
+            }
+            ui->sceneItemsGroup->setVisible(false);
+        }
+            break;
+        default:
+            break;
+    }
 
     ui->pattern->setText(QString::fromStdString(settings->expression));
     ui->ignoreCase->setChecked(settings->ignore_case);
     ui->timeout->setValue(settings->timeout);
+
+    IntFn sig = &QComboBox::currentIndexChanged;
+    QObject::connect(ui->actionType, sig, [this](int) {
+        auto type = static_cast<ActionType>(ui->actionType->currentData().toInt());
+        ui->sceneItemsGroup->setVisible(type != ActionType::SwitchScene);
+        ui->sceneGroup     ->setVisible(type == ActionType::SwitchScene);
+    });
 
     QObject::connect(ui->availableSources, &QComboBox::currentTextChanged, [this](const QString &str) {
         if (!str.isEmpty()) {
@@ -103,10 +147,32 @@ ActionConfigDialog::~ActionConfigDialog()
 
 void ActionConfigDialog::save(action_descriptor *settings)
 {
-    settings->type        = static_cast<ActionType>(ui->actionType->currentData().toInt());
-    settings->sceneitems  = to_std_vector(ui->affectedSources->toPlainText().split(line_split_regex, Qt::SkipEmptyParts));
-    settings->users       = to_std_vector(ui->users->toPlainText().split(line_split_regex, Qt::SkipEmptyParts));
-    settings->expression  = ui->pattern->text().trimmed().toStdString();
-    settings->ignore_case = ui->ignoreCase->isChecked();
-    settings->timeout     = ui->timeout->value();
+    auto type = static_cast<ActionType>(ui->actionType->currentData().toInt());
+    context_data_t data;
+
+    switch (type) {
+        case ActionType::Toggle:
+        case ActionType::Show:
+        case ActionType::Hide:
+            data = sceneitems_context_data {
+                to_std_vector(ui->affectedSources->toPlainText().split(line_split_regex, Qt::SkipEmptyParts))
+            };
+            break;
+        case ActionType::SwitchScene: {
+            auto text = ui->affectedScene->currentText().trimmed();
+            if (!text.isEmpty()) {
+                data = scene_context_data { text.toStdString() };
+            }
+        }
+            break;
+        default:
+            return;
+    }
+
+    settings->type         = type;
+    settings->context_data = data;
+    settings->users        = to_std_vector(ui->users->toPlainText().split(line_split_regex, Qt::SkipEmptyParts));
+    settings->expression   = ui->pattern->text().trimmed().toStdString();
+    settings->ignore_case  = ui->ignoreCase->isChecked();
+    settings->timeout      = ui->timeout->value();
 }

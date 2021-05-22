@@ -4,7 +4,7 @@
 #include <QSize>
 
 #define tr(token) obs_module_text("observer_settings." token)
-#define item_field(field) _settings.actions[index.row()].field
+#define item_field(field) _settings.actions[row].field
 
 static QString implode(const std::vector<std::string> &vec, const char *delim = "\n")
 {
@@ -25,6 +25,7 @@ static QMap<int, std::string> action_labels {
     add_enum(ActionType::Toggle),
     add_enum(ActionType::Hide),
     add_enum(ActionType::Show),
+    add_enum(ActionType::SwitchScene),
 };
 
 ObserverSettingsModel::ObserverSettingsModel(observer_settings settings, QObject *parent)
@@ -61,7 +62,21 @@ QVariant ObserverSettingsModel::data(const QModelIndex &index, int role) const
                 }
 
                 case Columns::Action: {
-                    auto sources = implode(item_field(sceneitems));
+                    QString sources;
+
+                    switch (item_field(type)) {
+                        case ActionType::Toggle:
+                        case ActionType::Hide:
+                        case ActionType::Show:
+                            sources = implode(get<sceneitems_context_data>(item_field(context_data)).sceneitems);
+                            break;
+                        case ActionType::SwitchScene:
+                            sources = QString::fromStdString(get<scene_context_data>(item_field(context_data)).scene);
+                            break;
+                        default:
+                            return QString();
+                    }
+
                     if (sources.isEmpty()) {
                         return QString();
                     }
@@ -96,6 +111,7 @@ bool ObserverSettingsModel::setData(const QModelIndex &index, const QVariant &va
     switch (index.column()) {
         case Columns::Active:
             if (role == Qt::CheckStateRole) {
+                int row = index.row();
                 item_field(active) = value.toBool();
                 return true;
             }

@@ -31,33 +31,48 @@ struct sceneitem_lookup_context {
     bool is_scene_active = false;
 };
 
-bool scene_item_lookup(obs_scene_t *, obs_sceneitem_t *item, void *ctx)
-{
-    auto context = (sceneitem_lookup_context*) ctx;
-
-    obs_source_t *source = obs_sceneitem_get_source(item);
-    const char *name = obs_source_get_name(source);
-
-    for (auto &lookup_name : *(context->lookup_names)) {
-        if (strcmp(name, lookup_name.c_str()) == 0) {
-            context->items.push_back(item);
-            if (context->is_scene_active) {
-                context->pivot_item = item;
-            }
-            break;
-        }
-    }
-
-    return true;
-}
-
-bool scene_lookup(void *ctx, obs_source_t *source)
+bool scene_items_lookup(void *ctx, obs_source_t *source)
 {
     auto context = (sceneitem_lookup_context*) ctx;
     context->is_scene_active = obs_source_active(source);
 
     obs_scene_t *scene = obs_scene_from_source(source);
-    obs_scene_enum_items(scene, scene_item_lookup, ctx);
+    obs_scene_enum_items(scene, [](obs_scene_t *, obs_sceneitem_t *item, void *ctx) {
+        auto context = (sceneitem_lookup_context*) ctx;
+
+        obs_source_t *source = obs_sceneitem_get_source(item);
+        const char *name = obs_source_get_name(source);
+
+        for (auto &lookup_name : *(context->lookup_names)) {
+            if (strcmp(name, lookup_name.c_str()) == 0) {
+                context->items.push_back(item);
+                if (context->is_scene_active) {
+                    context->pivot_item = item;
+                }
+                break;
+            }
+        }
+
+        return true;
+    }, ctx);
+
+    return true;
+}
+
+struct scene_lookup_context {
+    const char *lookup_name = nullptr;
+    obs_source_t *source = nullptr;
+};
+
+bool scene_lookup(void *ctx, obs_source_t *source)
+{
+    auto context = (scene_lookup_context*) ctx;
+    const char *name = obs_source_get_name(source);
+
+    if (strcmp(name, context->lookup_name) == 0) {
+        context->source = source;
+        return false;
+    }
 
     return true;
 }
@@ -84,7 +99,7 @@ public:
         _anyUser = !_userType && _users.isEmpty();
         _actionType = descr.type;
         _timeout = descr.timeout;
-        _sources = descr.sceneitems;
+        _data = descr.context_data;
     }
 
     void handle(const QString &user, const QString &message, const UserType &userFlags = UserType::None)
@@ -100,7 +115,7 @@ private:
     UserType _userType = UserType::None;
     ActionType _actionType;
     QVector<QString> _users;
-    std::vector<std::string> _sources;
+    context_data_t _data;
     bool _anyUser;
     int _timeout;
     long long _lastExec = 0;
@@ -119,10 +134,24 @@ private:
             _lastExec = time;
         }
 
+        switch (_actionType) {
+            case ActionType::Toggle:
+            case ActionType::Show:
+            case ActionType::Hide:
+                return execSceneItemsAction();
+            case ActionType::SwitchScene:
+                return execSceneAction();
+            default:
+                return;
+        }
+    }
+
+    inline void execSceneItemsAction()
+    {
         sceneitem_lookup_context ctx = {
-            .lookup_names = &_sources
+            .lookup_names = &get<sceneitems_context_data>(_data).sceneitems
         };
-        obs_enum_scenes(scene_lookup, &ctx);
+        obs_enum_scenes(scene_items_lookup, &ctx);
 
         bool visible;
 
@@ -142,6 +171,20 @@ private:
 
         for (auto it = ctx.items.begin(); it < ctx.items.end(); it++) {
             obs_sceneitem_set_visible(*it, visible);
+        }
+    }
+
+    inline void execSceneAction()
+    {
+        scene_lookup_context ctx = {
+            .lookup_name = get<scene_context_data>(_data).scene.c_str()
+        };
+        obs_enum_scenes(scene_lookup, &ctx);
+
+        if (ctx.source != nullptr) {
+            if (obs_frontend_get_current_scene() != ctx.source) {
+                obs_frontend_set_current_scene(ctx.source);
+            }
         }
     }
 };
@@ -168,17 +211,20 @@ void on_priv_message_received(const QString &user, const QString &message, const
 }
 
 #define obs_set(type, prop)  obs_data_set_##type(item, #prop, d.prop)
-#define obs_set_string(prop) obs_data_set_string(item, #prop, d.prop.c_str())
-#define obs_set_string_array(prop) {                           \
+#define obs_set_string_(propin, propout) obs_data_set_string(item, #propout, propin)
+#define obs_set_string(prop) obs_set_string_(d.prop.c_str(), prop)
+
+#define obs_set_string_array_(propin, propout) {               \
     auto _array = obs_data_array_create();                     \
-    for (auto v : d.prop) {                                    \
+    for (auto v : (propin)) {                                  \
         auto _item = obs_data_create();                        \
         obs_data_set_string(_item, JSON_SELF, v.c_str());      \
         obs_data_array_push_back(_array, _item);               \
         obs_data_release(_item);                               \
     }                                                          \
-    obs_data_set_array(item, #prop, _array);                   \
+    obs_data_set_array(item, #propout, _array);                \
 }
+#define obs_set_string_array(prop) obs_set_string_array_(d.prop, prop)
 
 static std::vector<std::string> read_string_array(obs_data_t *data, const char *prop)
 {
@@ -217,15 +263,28 @@ struct observer_settings read_settings()
 
     for (size_t i = 0; i < count; i++) {
         auto item = obs_data_array_item(actions, i);
+        auto type = static_cast<ActionType>(obs_data_get_int(item, "type"));
+        context_data_t data;
+
+        switch (type) {
+            case ActionType::Toggle:
+            case ActionType::Hide:
+            case ActionType::Show:
+                data = sceneitems_context_data { read_string_array(item, "sceneitems") };
+                break;
+            case ActionType::SwitchScene:
+                data = scene_context_data { obs_data_get_string(item, "scene") };
+                break;
+        }
 
         config.actions.push_back({
-            .type        = static_cast<ActionType>(obs_data_get_int(item, "type")),
-            .sceneitems  = read_string_array(item,   "sceneitems"),
-            .users       = read_string_array(item,   "users"),
-            .expression  = obs_data_get_string(item, "expression"),
-            .ignore_case = obs_data_get_bool(item,   "ignore_case"),
-            .active      = obs_data_get_bool(item,   "active"),
-            .timeout     = static_cast<int>(obs_data_get_int(item, "timeout")),
+            .type         = type,
+            .context_data = data,
+            .users        = read_string_array(item,   "users"),
+            .expression   = obs_data_get_string(item, "expression"),
+            .ignore_case  = obs_data_get_bool(item,   "ignore_case"),
+            .active       = obs_data_get_bool(item,   "active"),
+            .timeout      = static_cast<int>(obs_data_get_int(item, "timeout")),
         });
 
         obs_data_release(item);
@@ -244,13 +303,23 @@ void save_settings(const observer_settings *config)
         auto item = obs_data_create();
 
         obs_set_string_array(users);
-        obs_set_string_array(sceneitems);
 
         obs_set_string(expression);
         obs_set(bool,  ignore_case);
         obs_set(bool,  active);
         obs_set(int,   timeout);
         obs_set(int,   type);
+
+        switch (d.type) {
+            case ActionType::Toggle:
+            case ActionType::Hide:
+            case ActionType::Show:
+                obs_set_string_array_(get<sceneitems_context_data>(d.context_data).sceneitems, sceneitems);
+                break;
+            case ActionType::SwitchScene:
+                obs_set_string_(get<scene_context_data>(d.context_data).scene.c_str(), scene);
+                break;
+        }
 
         obs_data_array_push_back(array, item);
         obs_data_release(item);
